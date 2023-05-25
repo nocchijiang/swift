@@ -1245,12 +1245,10 @@ HelperGetObjCEncodingForType(const clang::ASTContext &Context,
                                             T, S, Extended);
 }
 
-static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
-                                               CanSILFunctionType fnType,
-                                               ArrayRef<SILParameterInfo> params,
-                                               StringRef fixedParamsString,
-                                               Size::int_type parmOffset,
-                                               bool useExtendedEncoding) {
+static std::string getObjCEncodingStringForTypes(
+    IRGenModule &IGM, CanSILFunctionType fnType,
+    ArrayRef<SILParameterInfo> params, StringRef fixedParamsString,
+    Size::int_type parmOffset, bool useExtendedEncoding) {
   auto resultType = fnType->getFormalCSemanticResult(IGM.getSILModule());
   auto &clangASTContext = IGM.getClangASTContext();
   
@@ -1260,7 +1258,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   {
     auto clangType = IGM.getClangType(resultType.getASTType());
     if (clangType.isNull())
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      return "";
     HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,
                                  useExtendedEncoding);
   }
@@ -1272,8 +1270,8 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
     auto clangType = IGM.getClangType(param.getArgumentType(
         IGM.getSILModule(), fnType, IGM.getMaximalTypeExpansionContext()));
     if (clangType.isNull())
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    
+      return "";
+
     // TODO. Some stuff related to Array and Function type is missing.
     // TODO. Encode type qualifier, 'in', 'inout', etc. for the parameter.
     HelperGetObjCEncodingForType(clangASTContext, clangType, paramsString,
@@ -1286,6 +1284,19 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
   encodingString += llvm::itostr(parmOffset);
   encodingString += fixedParamsString;
   encodingString += paramsString;
+  return encodingString;
+}
+
+static llvm::Constant *
+getObjCEncodingForTypes(IRGenModule &IGM, CanSILFunctionType fnType,
+                        ArrayRef<SILParameterInfo> params,
+                        StringRef fixedParamsString, Size::int_type parmOffset,
+                        bool useExtendedEncoding) {
+  auto encodingString = getObjCEncodingStringForTypes(
+      IGM, fnType, params, fixedParamsString, parmOffset, useExtendedEncoding);
+  if (encodingString.empty()) {
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
   return IGM.getAddrOfGlobalString(encodingString);
 }
 
@@ -1608,10 +1619,22 @@ irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.
   auto paramTypes = invokeTy->getParameters().slice(1);
-  
-  return getObjCEncodingForTypes(IGM, invokeTy, paramTypes,
-                                 "@?0", IGM.getPointerSize().getValue(),
+
+  return getObjCEncodingForTypes(IGM, invokeTy, paramTypes, "@?0",
+                                 IGM.getPointerSize().getValue(),
                                  /*extended*/ true);
+}
+
+std::string
+irgen::getBlockTypeExtendedEncodingString(IRGenModule &IGM,
+                                          CanSILFunctionType invokeTy) {
+  // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
+  // recursion of the usual '@?<...>' rule for blocks.
+  auto paramTypes = invokeTy->getParameters().slice(1);
+
+  return getObjCEncodingStringForTypes(IGM, invokeTy, paramTypes, "@?0",
+                                       IGM.getPointerSize().getValue(),
+                                       /*extended*/ true);
 }
 
 void irgen::emitObjCGetterDescriptor(IRGenModule &IGM,
