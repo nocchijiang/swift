@@ -241,6 +241,11 @@ public:
     }
   }
 
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override {
+    llvm_unreachable("Unimplemented");
+  }
+
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     // If we're bitwise-takable, use memcpy.
@@ -293,6 +298,10 @@ public:
     } else {
       this->callOutlinedDestroy(IGF, addr, T);
     }
+  }
+
+  std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    llvm_unreachable("unimplemented");
   }
 
   // The extra inhabitants of a record are determined from its fields.

@@ -29,6 +29,8 @@
 #include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
+#include <string>
+
 namespace llvm {
   class Constant;
   class Twine;
@@ -378,6 +380,13 @@ public:
                                   Address srcAddr, SILType T,
                                   bool isOutlined) const = 0;
 
+  virtual std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                               Size &offset) const = 0;
+  std::string encodeInitializeWithCopy(IRGenModule &IGM) const {
+    Size offset;
+    return encodeInitializeWithCopy(IGM, offset);
+  }
+
   /// Perform a copy-initialization from the given fixed-size buffer
   /// into an uninitialized fixed-size buffer, allocating the buffer if
   /// necessary.  Returns the address of the value inside the buffer.
@@ -400,6 +409,12 @@ public:
   /// Destroy an object of this type in memory.
   virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
                        bool isOutlined) const = 0;
+
+  virtual std::string encodeDestroy(IRGenModule &IGM, Size &offset) const = 0;
+  std::string encodeDestroy(IRGenModule &IGM) const {
+    Size offset;
+    return encodeDestroy(IGM, offset);
+  }
 
   /// Should optimizations be enabled which rely on the representation
   /// for this type being a single object pointer?

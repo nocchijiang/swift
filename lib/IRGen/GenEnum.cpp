@@ -98,6 +98,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #define DEBUG_TYPE "enum-layout"
 #include "llvm/Support/Debug.h"
 
@@ -544,6 +545,11 @@ namespace {
       }
     }
 
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
+
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
@@ -612,6 +618,10 @@ namespace {
           callOutlinedDestroy(IGF, addr, T);
         }
       }
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
 
     void packIntoEnumPayload(IRGenModule &IGM,
@@ -2856,6 +2866,10 @@ namespace {
       }
     }
 
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
+    }
+
     LoadedRef loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc,
                                    Address addr) const override {
       // There is no need to bitcast from the enum address. Loading from the
@@ -3121,6 +3135,11 @@ namespace {
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
+    }
+
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
@@ -5006,6 +5025,11 @@ namespace {
       }
     }
 
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
+
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       if (!ElementsAreABIAccessible) {
@@ -5084,6 +5108,10 @@ namespace {
       } else {
         callOutlinedDestroy(IGF, addr, T);
       }
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
 
   private:
@@ -5911,6 +5939,11 @@ namespace {
                                  dest, src);
     }
 
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
+
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       emitInitializeWithTakeCall(IGF, T,
@@ -5925,6 +5958,10 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
       emitDestroyCall(IGF, T, addr);
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
 
     void getSchema(ExplosionSchema &schema) const override {
@@ -6326,6 +6363,9 @@ namespace {
                  bool isOutlined) const override {
       return Strategy.destroy(IGF, addr, T, isOutlined);
     }
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      return Strategy.encodeDestroy(IGM, offset);
+    }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address dest, SILType T,
                               bool isOutlined) const override {
@@ -6334,6 +6374,10 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       return Strategy.initializeWithCopy(IGF, dest, src, T, isOutlined);
+    }
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      return Strategy.encodeInitializeWithCopy(IGM, offset);
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {

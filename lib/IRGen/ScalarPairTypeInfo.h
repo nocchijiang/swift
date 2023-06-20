@@ -19,8 +19,10 @@
 #ifndef SWIFT_IRGEN_SCALARPAIRTYPEINFO_H
 #define SWIFT_IRGEN_SCALARPAIRTYPEINFO_H
 
+#include "GenFunc.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
+#include "llvm/Support/ScopedPrinter.h"
 
 namespace swift {
 namespace irgen {
@@ -85,6 +87,29 @@ public:
     auto second = IGF.Builder.CreateLoad(secondAddr);
     asDerived().emitRetainSecondElement(IGF, second);
     e.add(second);
+  }
+
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override {
+    // Encode `loadAsCopy` behavior, followed by `initialize`.
+    std::string encoding;
+    if (!asDerived().isFirstElementTrivial()) {
+      encoding += llvm::to_string(offset.getValue());
+      auto first = asDerived().encodeCopyFirstElement();
+      encoding += first;
+      encoding += getBlockCaptureInitializeKindEncoding(
+          BlockCaptureInitializeKind::Store);
+    }
+
+    offset += asDerived().getSecondElementOffset(IGM);
+    if (!asDerived().isSecondElementTrivial()) {
+      encoding += llvm::to_string(offset.getValue());
+      auto second = asDerived().encodeCopySecondElement();
+      encoding += second;
+      encoding += getBlockCaptureInitializeKindEncoding(
+          BlockCaptureInitializeKind::Store);
+    }
+    return encoding;
   }
 
   void loadAsTake(IRGenFunction &IGF, Address addr,
@@ -159,6 +184,23 @@ public:
     }
   }
 
+  std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    std::string encoding;
+    if (!asDerived().isFirstElementTrivial()) {
+      encoding += llvm::to_string(offset.getValue());
+      auto first = asDerived().encodeDestroyFirstElement();
+      encoding += first;
+    }
+
+    offset += asDerived().getSecondElementOffset(IGM);
+    if (!asDerived().isSecondElementTrivial()) {
+      encoding += llvm::to_string(offset.getValue());
+      auto second = asDerived().encodeDestroySecondElement();
+      encoding += second;
+    }
+    return encoding;
+  }
+
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &payload,
@@ -203,6 +245,8 @@ public:
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);
   }
+  std::string encodeCopyFirstElement() const { return ""; }
+  std::string encodeDestroyFirstElement() const { return ""; }
 
   static bool isSecondElementTrivial() {
     return true;
@@ -215,6 +259,8 @@ public:
                               Address valueAddr) const {
     IGF.Builder.CreateStore(value, valueAddr);
   }
+  std::string encodeCopySecondElement() const { return ""; }
+  std::string encodeDestroySecondElement() const { return ""; }
 };
 
 }

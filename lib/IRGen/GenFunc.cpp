@@ -88,6 +88,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ScopedPrinter.h"
 
 #include "BitPatternBuilder.h"
@@ -325,6 +326,8 @@ namespace {
                                 Address fnAddr) const {
       IGF.Builder.CreateStore(fn, fnAddr);
     }
+    std::string encodeCopyFirstElement() const { return ""; }
+    std::string encodeDestroyFirstElement() const { return ""; }
 
     static Size getSecondElementOffset(IRGenModule &IGM) {
       return IGM.getPointerSize();
@@ -358,6 +361,15 @@ namespace {
         IGF.Builder.CreateStore(context, dataAddr);
       else
         IGF.emitNativeStrongAssign(context, dataAddr);
+    }
+    std::string encodeCopySecondElement() const {
+      if (isPOD(ResilienceExpansion::Maximal)) {
+        return "";
+      }
+      return getBlockCaptureKindEncoding(BlockCaptureKind::Strong);
+    }
+    std::string encodeDestroySecondElement() const {
+      return encodeCopySecondElement();
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -540,9 +552,16 @@ namespace {
                             SILType T, bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "copying @block_storage");
     }
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {
       IGF.unimplemented(SourceLoc(), "destroying @block_storage");
+    }
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
   };
 } // end anonymous namespace
@@ -2258,15 +2277,32 @@ Optional<StackAddress> irgen::emitFunctionPartialApplication(
   return stackAddr;
 }
 
+std::string irgen::getBlockCaptureKindEncoding(BlockCaptureKind kind) {
+  switch (kind) {
+  case BlockCaptureKind::Strong:
+    return "s";
+  }
+  llvm_unreachable("unhandled BlockCaptureKind");
+}
+
+std::string
+irgen::getBlockCaptureInitializeKindEncoding(BlockCaptureInitializeKind kind) {
+  switch (kind) {
+  case BlockCaptureInitializeKind::Store:
+    return "S";
+  }
+  llvm_unreachable("unhandled BlockCaptureInitializeKind");
+}
+
 /// Emit the block copy helper for a block.
 static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
                                            CanSILBlockStorageType blockTy,
                                            const BlockStorageTypeInfo &blockTL){
   // See if we've produced a block copy helper for this type before.
-  // TODO: this need further refinement; we need to generate a unique encoding
-  // for the capture type, which we know that it is always an [SILFunctionType]
-  // as of now.
-  std::string funcName = "block_copy_helper_reused";
+  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+  std::string funcName = "block_copy_helper_" +
+                         llvm::to_string(blockTL.getFixedAlignment()) + "_" +
+                         captureTL.encodeInitializeWithCopy(IGM);
   if (auto f = IGM.getModule()->getFunction(funcName))
     return f;
 
@@ -2296,7 +2332,6 @@ static llvm::Function *emitBlockCopyHelper(IRGenModule &IGM,
 
   auto destCapture = blockTL.projectCapture(IGF, dest);
   auto srcCapture = blockTL.projectCapture(IGF, src);
-  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
   captureTL.initializeWithCopy(IGF, destCapture, srcCapture,
                                blockTy->getCaptureAddressType(), false);
 
@@ -2310,10 +2345,10 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
                                            CanSILBlockStorageType blockTy,
                                            const BlockStorageTypeInfo &blockTL){
   // See if we've produced a block destroy helper for this type before.
-  // TODO: this need further refinement; we need to generate a unique encoding
-  // for the capture type, which we know that it is always an [SILFunctionType]
-  // as of now.
-  std::string funcName = "block_destroy_helper_reused";
+  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+  std::string funcName = "block_destroy_helper_" +
+                         llvm::to_string(blockTL.getFixedAlignment()) + "_" +
+                         captureTL.encodeDestroy(IGM);
   if (auto f = IGM.getModule()->getFunction(funcName))
     return f;
 
@@ -2339,7 +2374,6 @@ static llvm::Function *emitBlockDisposeHelper(IRGenModule &IGM,
   auto storage = Address(params.claimNext(), blockTL.getStorageType(),
                          blockTL.getFixedAlignment());
   auto capture = blockTL.projectCapture(IGF, storage);
-  auto &captureTL = IGM.getTypeInfoForLowered(blockTy->getCaptureType());
   captureTL.destroy(IGF, capture, blockTy->getCaptureAddressType(),
                     false /*block storage code path: never outlined*/);
   IGF.Builder.CreateRetVoid();
@@ -2356,8 +2390,10 @@ buildBlockDescriptor(IRGenFunction &IGF, const BlockStorageTypeInfo &storageTL,
   auto blockStorageSize = storageTL.getFixedSize().getValue();
   descriptorName += llvm::to_string(blockStorageSize) + "_";
   if (!isTriviallyDestroyable) {
-    // TODO: replace with capture encoding.
-    descriptorName += "has_capture_";
+    descriptorName += llvm::to_string(storageTL.getFixedAlignment()) + "_";
+    auto &captureTL = IGF.IGM.getTypeInfoForLowered(blockTy->getCaptureType());
+    descriptorName += captureTL.encodeInitializeWithCopy(IGF.IGM) + "_" +
+                      captureTL.encodeDestroy(IGF.IGM);
   }
   auto typeEncoding = getBlockTypeExtendedEncodingString(IGF.IGM, invokeTy);
   // Replace occurrences of '@' with '\1'. '@' is reserved on ELF platforms as

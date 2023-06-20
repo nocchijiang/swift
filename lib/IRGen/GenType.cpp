@@ -194,6 +194,11 @@ void LoadableTypeInfo::initializeWithCopy(IRGenFunction &IGF, Address destAddr,
   }
 }
 
+std::string LoadableTypeInfo::encodeInitializeWithCopy(IRGenModule &IGM,
+                                                       Size &offset) const {
+  llvm_unreachable("Unimplemented");
+}
+
 LoadedRef LoadableTypeInfo::loadRefcountedPtr(IRGenFunction &IGF,
                                               SourceLoc loc,
                                               Address addr) const {
@@ -988,6 +993,9 @@ namespace {
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T,
                  bool isOutlined) const override {}
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    return "";
+    }
     void packIntoEnumPayload(IRGenModule &IGM,
                              IRBuilder &builder, EnumPayload &payload,
                              Explosion &src, unsigned offset) const override {}
@@ -1233,7 +1241,11 @@ namespace {
                  bool isOutlined) const override {
       /* nop */
     }
-    
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
+    }
+
     void getSchema(ExplosionSchema &schema) const override {
       for (auto scalarTy: ScalarTypes) {
         schema.add(ExplosionSchema::Element::forScalar(scalarTy));
@@ -1308,9 +1320,18 @@ namespace {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
     }
 
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
+
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
       llvm_unreachable("cannot opaquely manipulate immovable types!");
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
   };
 
@@ -2569,6 +2590,11 @@ public:
     llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
   }
 
+  virtual std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                               Size &offset) const override {
+    llvm_unreachable("Unimplemented");
+  }
+
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address src, SILType T,
                                     bool isOutlined) const override {
@@ -2578,6 +2604,11 @@ public:
   virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
                        bool isOutlined) const override {
     llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual std::string encodeDestroy(IRGenModule &IGM,
+                                    Size &offset) const override {
+    llvm_unreachable("unimplemented");
   }
 };
 

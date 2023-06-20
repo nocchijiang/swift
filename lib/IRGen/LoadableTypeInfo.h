@@ -114,6 +114,9 @@ public:
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                           SILType T, bool isOutlined) const override;
 
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override;
+
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.
   ///

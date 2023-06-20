@@ -97,6 +97,11 @@ public:
     emitInitializeWithCopyCall(IGF, T, dest, src);
   }
 
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override {
+    llvm_unreachable("Unimplemented");
+  }
+
   void initializeArrayWithCopy(IRGenFunction &IGF,
                                Address dest, Address src, llvm::Value *count,
                                SILType T) const override {
@@ -131,6 +136,10 @@ public:
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
                bool isOutlined) const override {
     emitDestroyCall(IGF, T, addr);
+  }
+
+  std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    llvm_unreachable("unimplemented");
   }
 
   void destroyArray(IRGenFunction &IGF, Address addr, llvm::Value *count,

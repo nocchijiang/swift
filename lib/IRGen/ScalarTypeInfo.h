@@ -21,9 +21,10 @@
 
 #include "EnumPayload.h"
 #include "Explosion.h"
-#include "TypeInfo.h"
-#include "IRGenFunction.h"
 #include "GenEnum.h"
+#include "IRGenFunction.h"
+#include "TypeInfo.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 namespace irgen {
@@ -52,6 +53,11 @@ public:
     Explosion temp;
     asDerived().Derived::loadAsCopy(IGF, src, temp);
     asDerived().Derived::initialize(IGF, temp, dest, isOutlined);
+  }
+
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override {
+    return asDerived().Derived::encodeInitializeWithCopy(IGM, offset);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
@@ -206,7 +212,11 @@ public:
       asDerived().emitScalarRelease(IGF, value, IGF.getDefaultAtomicity());
     }
   }
-  
+
+  std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    llvm_unreachable("unimplemented");
+  }
+
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &payload,

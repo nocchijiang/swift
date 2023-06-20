@@ -738,6 +738,10 @@ namespace {
                              destructorFnAddr, args);
     }
 
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
+    }
+
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
@@ -787,6 +791,11 @@ namespace {
                          ClangFieldInfo>::initializeWithCopy(IGF, destAddr,
                                                              srcAddr, T,
                                                              isOutlined);
+    }
+
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
     }
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,

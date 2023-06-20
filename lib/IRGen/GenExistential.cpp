@@ -273,6 +273,11 @@ namespace {
       }
     }
 
+    std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                         Size &offset) const override {
+      llvm_unreachable("Unimplemented");
+    }
+
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
       if (isOutlined) {
@@ -310,6 +315,10 @@ namespace {
         OutliningMetadataCollector collector(IGF);
         collector.emitCallToOutlinedDestroy(existential, T, *this);
       }
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
   };
 
@@ -508,6 +517,10 @@ namespace {
       // Small type (scalar) do not create outlined function
       llvm::Value *value = asDerived().loadValue(IGF, addr);
       asDerived().emitValueRelease(IGF, value, IGF.getDefaultAtomicity());
+    }
+
+    std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+      llvm_unreachable("unimplemented");
     }
 
     void packIntoEnumPayload(IRGenModule &IGM,
@@ -969,6 +982,11 @@ public:
     }
   }
 
+  std::string encodeInitializeWithCopy(IRGenModule &IGM,
+                                       Size &offset) const override {
+    llvm_unreachable("Unimplemented");
+  }
+
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     if (isOutlined) {
@@ -999,7 +1017,11 @@ public:
     call->setDoesNotThrow();
     return;
   }
-               
+
+  std::string encodeDestroy(IRGenModule &IGM, Size &offset) const override {
+    llvm_unreachable("unimplemented");
+  }
+
   // Opaque existentials have extra inhabitants and spare bits in their type
   // metadata pointer, matching those of a standalone thick metatype (which
   // in turn match those of a heap object).
